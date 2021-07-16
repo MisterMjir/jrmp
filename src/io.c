@@ -148,6 +148,60 @@ static int data_to_files_t(struct JRMP_Data *data)
   FN_EXIT;
 }
 
+/* Write zones */
+static int data_to_files_z(struct JRMP_Data *data)
+{
+  FILE *file;
+  uint16_t zone_num;
+  uint32_t zone_tile_start;
+  uint32_t zone_tile_end;
+  uint32_t zone_flags;
+  char     zone_id[4];
+
+  FN_START;
+
+  if (!(file = fopen(".jrmpz", "wb"))) ERROR_EXIT;
+  PUSH('f', file);
+
+  /* Write zone num */
+  if (JRMP_data_block_seek(data, "ZONES  ")) ERROR_EXIT;
+  IO(read, &zone_num, 1, data->file);
+  IO(write, &zone_num, 1, file);
+
+  for (uint16_t i = 0; i < zone_num; ++i) {
+    IO(read, &zone_tile_start, 1, data->file);
+    IO(read, &zone_tile_end,   1, data->file);
+    IO(read, &zone_flags,      1, data->file);
+    IO(read, &zone_id,         1, data->file);
+    
+    IO(write, &zone_tile_start, 1, file);
+    IO(write, &zone_tile_end,   1, file);
+    IO(write, &zone_flags,      1, file);
+    IO(write, &zone_id,         1, file);
+  }
+
+  FN_EXIT;
+}
+
+/* Write script */
+#define SCRIPT_SIZE 4096
+static int data_to_files_s(struct JRMP_Data *data)
+{
+  FILE *file;
+  char script[SCRIPT_SIZE];
+
+  FN_START;
+
+  if (!(file = fopen(".jrmps", "wb"))) ERROR_EXIT;
+  PUSH('f', file);
+
+  JRMP_data_block_seek(data, "SCRIPT ");
+  IO(read, script, SCRIPT_SIZE, data->file);
+  IO(write, script, SCRIPT_SIZE, file);
+
+  FN_EXIT;
+}
+
 /*
  * JRMP_data_to_files
  * @desc
@@ -160,6 +214,8 @@ int JRMP_data_to_files(struct JRMP_Data *data)
 
   if (data_to_files_h(data)) return -1; /* Map info (header) */
   if (data_to_files_t(data)) return -1; /* Tile info */
+  if (data_to_files_z(data)) return -1; /* Zone info */
+  if (data_to_files_s(data)) return -1; /* Script info */
 
   return 0;
 }
