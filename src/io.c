@@ -67,7 +67,7 @@ static int data_to_files_h(struct JRMP_Data *data)
 
 /* Write the layers and tiles */
 #define LAYER_SIZE (sizeof(uint8_t) + sizeof(float))
-#define TILE_SIZE  (sizeof(uint16_t) + sizeof(uint8_t))
+#define TILE_SIZE  (sizeof(uint16_t))
 static int data_to_files_t(struct JRMP_Data *data)
 {
   FILE    *table;                       /* Stores the names of the layer files */
@@ -80,7 +80,6 @@ static int data_to_files_t(struct JRMP_Data *data)
   uint8_t  layer_id;                    /* Id of a layer */
   float    layer_parallax;              /* Parallax of a layer */
   uint16_t tile_idt;                    /* Tile's idt */
-  int8_t   tile_flags;                  /* Tile's flags */
   uint16_t tile_write_num;              /* How many tiles to write */
 
   DATA_CHECK;
@@ -126,7 +125,6 @@ static int data_to_files_t(struct JRMP_Data *data)
       /* Get the tile */
       SEEK(data->file, tile_current);
       IO(read, &tile_idt, 1, data->file);
-      IO(read, &tile_flags, 1, data->file);
 
       if (tile_idt == 0xFFFF) break; /* Shouldn't hit the terminating tile, but just in case */
 
@@ -134,7 +132,6 @@ static int data_to_files_t(struct JRMP_Data *data)
       if ((tile_idt & 0x000F) == 0) {
         tile_write_num = (tile_idt >> 4);
         tile_idt = 0x0001;
-        tile_flags = 0;
       }
       else {
         tile_write_num = 1;
@@ -142,8 +139,7 @@ static int data_to_files_t(struct JRMP_Data *data)
 
       /* Write the tile(s) */
       for (uint16_t k = 0; k < tile_write_num; ++k) {
-        IO(write, &tile_idt,   1, layer);
-        IO(write, &tile_flags, 1, layer);
+        IO(write, &tile_idt, 1, layer);
       }
 
       j += tile_write_num - 1;
@@ -151,9 +147,8 @@ static int data_to_files_t(struct JRMP_Data *data)
     }
 
     /* Write the terminating layer tile */
-    tile_idt = 0xFFFF; tile_flags = 0;
-    IO(write, &tile_idt,   1, layer);
-    IO(write, &tile_flags, 1, layer);
+    tile_idt = 0xFFFF;
+    IO(write, &tile_idt, 1, layer);
 
     POP; /* Pop the layer file */
   }
@@ -267,12 +262,8 @@ int files_to_data_h(FILE *data, const uint64_t name_pos, const uint64_t current_
 }
 
 /* Write tiles */
-#define R_TILE \
-  IO(read, &temp_16, 1, layer); \
-  IO(read, &temp_8, 1, layer);
-#define W_TILE \
-  IO(write, &temp_16, 1, data); \
-  IO(write, &temp_8, 1, data);
+#define R_TILE IO(read, &temp_16, 1, layer);
+#define W_TILE IO(write, &temp_16, 1, data);
 #define RW_TILE \
   R_TILE; \
   W_TILE;
@@ -308,10 +299,6 @@ int files_to_data_t(FILE *data, const uint64_t name_pos, const uint64_t current_
   IO(write, &layer_parallax, LT_LAYERS(lt_num), data);
   TELL(tile_pos, data);
   
-  printf("Number of layers %d\n", LT_LAYERS(lt_num));
-  printf("Layer offset is at %lu\n", layer_pos);
-  printf("Tile offset is at %lu\n", tile_pos);
-
   if (!(table = fopen(".jrmplt", "rb"))) ERROR_EXIT;
   PUSH('f', table);
 
